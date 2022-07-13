@@ -1,0 +1,17 @@
+{
+  "name": "@kbrw/exz_js_dom",
+  "version": "1.1.1",
+  "description": "JS dom to erlang parser for EXZ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "css-select": "~1.2.0",
+    "deepcopy": "~0.6.0",
+    "htmlparser2": "~3.9.0",
+    "node_erlastic": "~0.1.0"
+  },
+  "author": "Kbrw <contact@kbrw.fr> (https://github.com/kbrw)",
+  "license": "MIT"
+}
