@@ -3,7 +3,7 @@ defmodule ExzTest do
   doctest Exz
   import Exz
 
-  def myfun do
+  def myfun1 do
     styles = ["red","blue"]
     exz in: "test", sel: "body", toto: totoZ <> "titi", tag: "mybody" do
       z sel: ".l3", style: nil, tag: "aaaa", tt: ttZ <> "cc" do "me" end
@@ -26,7 +26,22 @@ defmodule ExzTest do
     end
   end
 
+  def myfun2 do
+    exz in: "test2", sel: "body", class: "content", tag: "div" do
+      z sel: "img", alt: "altmsg"
+      z sel: ".list", class: classZ <> " newlist"
+      z sel: ".list" do
+        ["a","b","c","d","e"] |> Enum.map(fn e->
+          exz in: "test2", sel: ".elem" do
+            z sel: "img", class: "#{classZ} elem#{e}"
+          end
+        end)
+      end
+    end
+  end
+
   test "simple jsxz" do
-    IO.puts myfun()
+    IO.puts myfun1()
+    IO.puts myfun2()
   end
 end
