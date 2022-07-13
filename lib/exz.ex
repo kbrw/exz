@@ -1,22 +1,22 @@
 defmodule Exz do
   defmacro exz(attrs,[do: exz_do] \\ [do: quote do childrenZ end]) do
-    unless Process.whereis(__MODULE__) do
+    unless Process.whereis(__MODULE__) do # ensure JS HTML parser server exists
       {:ok,pid} = Exos.Proc.start_link("node --stack-size=65500 index.js",%{},[cd: '#{:code.priv_dir(:exz)}/js_dom/'], name: __MODULE__)
-      Process.unlink(pid)
+      Process.unlink(pid) # do not need to handle lifetime of HTML parser server as it exists only during build (macro exec)
     end
     
-    z_blocks_ast = case exz_do do
-      {:__block__,_,[{:z,_,_}|_]=blocks}-> blocks
-      {:z,_,_}=ast-> [ast]
-      _-> []
+    z_blocks_ast = case exz_do do # get [z()] transfo AST
+      {:__block__,_,[{:z,_,_}|_]=blocks}-> blocks # if called as esz do z() z() end
+      {:z,_,_}=ast-> [ast] # if called as esz do z() end
+      _-> :no_z_transfos # no z() transformation !
     end
     {rootbody,z_blocks} = case z_blocks_ast do
-      []-> {exz_do,[]}
+      :no_z_transfos-> {exz_do,[]} # if no z() transfo : esz do BODY end, then BODY replaces matching exz children
       _->
         blocks = for {:z,_,[attrs|do_block]} <- z_blocks_ast do
           %{sel: attrs[:sel], tag: attrs[:tag],
-            attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag]), 
-            body: List.first(do_block)[:do] || quote do childrenZ end}
+            attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag]), # z(attrs) sel: and tag: attrs are reserved EXS and not html attr
+            body: List.first(do_block)[:do] || quote do childrenZ end} # z(sel: "c") body default is to copy all children (childrenZ)
         end
         {quote do childrenZ end,blocks}
     end
@@ -25,7 +25,7 @@ defmodule Exz do
       {file,sel} when is_binary(file) and is_binary(sel)->
         path = Path.join(Path.expand(Mix.Project.config[:exz_dir] || "."),file)
         path = String.replace_suffix(path,".html","") <> ".html"
-        dom = GenServer.call(__MODULE__, {:parse_file, path, sel, Enum.map(z_blocks,& &1.sel)})
+        {:ok,dom} = GenServer.call(__MODULE__, {:parse_file, path, sel, Enum.map(z_blocks,& &1.sel)})
         zroot = %{tag: attrs[:tag], sel: attrs[:sel],
                  attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag,:in]),
                  body: rootbody}

@@ -1,6 +1,11 @@
 # Exz
 
-**TODO: Add description**
+JsxZ like library in Elixir.
+
+Use the same JS parser as JSXZ in a port (htmlparser2+css-select for HTML
+parser and available CSS selectors).
+
+**Work in progress, not production ready : yet to be documented and better tested**
 
 ## Installation
 
@@ -18,4 +23,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at <https://hexdocs.pm/exz>.
-

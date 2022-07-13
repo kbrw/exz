@@ -29,8 +29,7 @@ defmodule ExzTest do
   def myfun2 do
     exz in: "test2", sel: "body", class: "content", tag: "div" do
       z sel: "img", alt: "altmsg"
-      z sel: ".list", class: classZ <> " newlist"
-      z sel: ".list" do
+      z sel: ".list", class: "#{classZ} newlist" do
         ["a","b","c","d","e"] |> Enum.map(fn e->
           exz in: "test2", sel: ".elem" do
             z sel: "img", class: "#{classZ} elem#{e}"

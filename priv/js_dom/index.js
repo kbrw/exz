@@ -24,7 +24,7 @@ Server((term,from,state,done) => {
       let [html_file,sel,zsels] = rest
       let parser = new htmlParser.Parser(
         new htmlParser.DomHandler((err, fulldom) => {
-          if (err){ done("reply",Bert.tuple(Bert.atom("error"), "fail_to_parse")) }
+          if (err){ done("reply",Bert.tuple(Bert.atom("error"), "fail to parse HTML")) }
           let dom = cssSelector.selectOne(sel,fulldom)
           zsels.forEach( (zsel, zselidx) => {
             cssSelector(zsel,dom).forEach((subdom,i) => {
@@ -33,7 +33,7 @@ Server((term,from,state,done) => {
             })
           })
           //  if (!dom) error("selector "+jsxZ.rootSelector+" does not match any node in "+ jsxZ.htmlPath,jsxZ.selNode)
-          done("reply",domToBert(dom))
+          done("reply",Bert.tuple(Bert.atom("ok"),domToBert(dom)))
         }))
       parser.write(fs.readFileSync(html_file, 'utf8'))
       parser.done()
