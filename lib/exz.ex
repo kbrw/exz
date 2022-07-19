@@ -1,8 +1,8 @@
 defmodule Exz do
   defmacro exz(attrs,[do: exz_do] \\ [do: quote do childrenZ end]) do
-    unless Process.whereis(__MODULE__) do # ensure JS HTML parser server exists
-      {:ok,pid} = Exos.Proc.start_link("node --stack-size=65500 index.js",%{},[cd: '#{:code.priv_dir(:exz)}/js_dom/'], name: __MODULE__)
-      Process.unlink(pid) # do not need to handle lifetime of HTML parser server as it exists only during build (macro exec)
+    case Exos.Proc.start_link("node --stack-size=65500 index.js",%{},[cd: '#{:code.priv_dir(:exz)}/js_dom/'], name: __MODULE__) do
+      {:error, {:already_started,_}}-> :ok # ensure JS HTML parser server exists, do nothing if it is
+      {:ok,pid}-> Process.unlink(pid) # do not need to handle lifetime of HTML parser server as it exists only during build (macro exec)
     end
     
     z_blocks_ast = case exz_do do # get [z()] transfo AST
