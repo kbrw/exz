@@ -62,15 +62,17 @@ defmodule Exz do
   end
 
   def ast_zmapping(ast, matchidx, attrs, children, z_blocks) do
-    Macro.postwalk(ast,fn
-      {:indexZ,_,_}-> matchidx
-      {:childrenZ,_,_}-> Enum.map(children,&dom2ast(&1,z_blocks))
-      {id,_,_}=id_ast when is_atom(id)->
+    {ast,_} = Macro.prewalk(ast, :no_subz, fn
+      {atom,_,_}=d, _ when atom in [:z,:exz]-> {d,:subz}
+      {:indexZ,_,_}, :no_subz-> {matchidx,:no_subz}
+      {:childrenZ,_,_}, :no_subz-> {Enum.map(children,&dom2ast(&1,z_blocks)),:no_subz}
+      {id,_,_}=id_ast, :no_subz when is_atom(id)->
         case String.split(to_string(id),"Z") do
-          [name,""]-> attrs[:"#{name}"]
-          _other-> id_ast
+          [name,""]-> {attrs[:"#{name}"],:no_subz}
+          _other-> {id_ast,:no_subz}
         end
-      other-> other
+      other, acc-> {other,acc}
     end)
+    ast
   end
 end
