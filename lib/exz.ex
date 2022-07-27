@@ -35,9 +35,14 @@ defmodule Exz do
   end
 
   def dom2ast(bin,_z_blocks) when is_binary(bin) do bin end
-  def dom2ast({tag,nil,attrs,[]},_z_blocks) do
+  @void_elems ~w"area base br col embed hr img input link meta source track wbr"
+  def dom2ast({tag,nil,attrs,[]},_z_blocks) when tag in @void_elems do
     attrs = Enum.map(attrs, fn {k,v}-> "#{k}=\"#{v}\"" end)
-    "<#{tag} #{attrs}/>"
+    if tag in @void_elems do
+      "<#{tag} #{attrs}>"
+    else
+      "<#{tag} #{attrs}></#{tag}>"
+    end
   end
   def dom2ast({tag,nil,attrs,children},z_blocks) do
     attrs = Enum.map(attrs, fn {k,v}-> "#{k}=\"#{v}\"" end)
@@ -54,10 +59,12 @@ defmodule Exz do
         v = ast_zmapping(v,matchidx,attrs,children,z_blocks)
         quote do unquote(" #{k}=\"") <> unquote(v) <> "\"" end
     end)
-    if ast not in ["",[]] do 
-      ["<#{ztag || tag}",attrs,">",ast,"</#{ztag || tag}>"]
-    else
-      ["<#{ztag || tag}",attrs,"/>"]
+    use_tag = ztag || tag
+    cond do
+      ast in ["",[]] and use_tag in @void_elems->
+        ["<#{use_tag}",attrs,">"]
+      true->
+        ["<#{use_tag}",attrs,">",ast,"</#{use_tag}>"]
     end
   end
 
