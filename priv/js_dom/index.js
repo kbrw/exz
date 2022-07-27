@@ -26,6 +26,7 @@ Server((term,from,state,done) => {
         new htmlParser.DomHandler((err, fulldom) => {
           if (err){ done("reply",Bert.tuple(Bert.atom("error"), "fail to parse HTML")) }
           let dom = cssSelector.selectOne(sel,fulldom)
+          if(!dom){ throw new Error(`cannot find ExZ css selector ${sel} in file ${html_file}`) }
           zsels.forEach( (zsel, zselidx) => {
             cssSelector(zsel,dom).forEach((subdom,i) => {
               subdom.zselidx = zselidx
@@ -39,6 +40,6 @@ Server((term,from,state,done) => {
       parser.done()
     }
   } catch (err) {
-    done("reply","error")
+    done("reply",Bert.tuple(Bert.atom("error"),err.toString()))
   }
 },(init) => ({}) )

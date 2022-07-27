@@ -11,8 +11,8 @@ defmodule Exz do
       _-> :no_z_transfos # no z() transformation !
     end
     {rootbody,z_blocks} = case z_blocks_ast do
-      :no_z_transfos-> {exz_do,[]} # if no z() transfo : esz do BODY end, then BODY replaces matching exz children
-      _->
+      :no_z_transfos-> {exz_do,[]} # if no z() transfo : `exz do BODY end`, then BODY replaces matching exz children
+      _-> # there are `z sel: ...` transformers
         blocks = for {:z,_,[attrs|do_block]} <- z_blocks_ast do
           %{sel: attrs[:sel], tag: attrs[:tag],
             attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag]), # z(attrs) sel: and tag: attrs are reserved EXS and not html attr
