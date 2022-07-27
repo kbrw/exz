@@ -21,17 +21,19 @@ defmodule Exz do
         {quote do childrenZ end,blocks}
     end
     
-    case {attrs[:in],attrs[:sel]} do
+    tpl_q = case {attrs[:in],attrs[:sel]} do
       {file,sel} when is_binary(file) and is_binary(sel)->
         path = Path.join(Path.expand(Mix.Project.config[:exz_dir] || "."),file)
         path = String.replace_suffix(path,".html","") <> ".html"
         {:ok,dom} = GenServer.call(__MODULE__, {:parse_file, path, sel, Enum.map(z_blocks,& &1.sel)})
         zroot = %{tag: attrs[:tag], sel: attrs[:sel],
-                 attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag,:in]),
+                 attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag,:in,:debug]),
                  body: rootbody}
         ast = dom2ast(put_elem(dom,1,{-1,0}),[zroot|z_blocks])
         quote do IO.chardata_to_string(unquote(ast)) end
     end
+    if attrs[:debug] do IO.puts(["debug exz : expanding to :\n",tpl_q |> Macro.to_string |> Code.format_string!]) end
+    tpl_q
   end
 
   def dom2ast(bin,_z_blocks) when is_binary(bin) do bin end
