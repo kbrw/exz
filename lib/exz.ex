@@ -14,8 +14,8 @@ defmodule Exz do
       :no_z_transfos-> {exz_do,[]} # if no z() transfo : `exz do BODY end`, then BODY replaces matching exz children
       _-> # there are `z sel: ...` transformers
         blocks = for {:z,_,[attrs|do_block]} <- z_blocks_ast do
-          %{sel: attrs[:sel], tag: attrs[:tag],
-            attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag]), # z(attrs) sel: and tag: attrs are reserved EXS and not html attr
+          %{sel: attrs[:sel], tag: attrs[:tag], replace: attrs[:replace] == true,
+            attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag,:replace]), # z(attrs) sel: and tag: attrs are reserved EXS and not html attr
             body: List.first(do_block)[:do] || quote do childrenZ end} # z(sel: "c") body default is to copy all children (childrenZ)
         end
         {quote do childrenZ end,blocks}
@@ -26,7 +26,7 @@ defmodule Exz do
         path = Path.join(Path.expand(Mix.Project.config[:exz_dir] || "."),file)
         path = String.replace_suffix(path,".html","") <> ".html"
         {:ok,dom} = GenServer.call(__MODULE__, {:parse_file, path, sel, Enum.map(z_blocks,& &1.sel)})
-        zroot = %{tag: attrs[:tag], sel: attrs[:sel],
+        zroot = %{tag: attrs[:tag], sel: attrs[:sel], replace: false,
                  attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag,:in,:debug]),
                  body: rootbody}
         ast = dom2ast(put_elem(dom,1,{-1,0}),[zroot|z_blocks])
@@ -53,7 +53,7 @@ defmodule Exz do
      "</#{tag}>"]
   end
   def dom2ast({tag,{zidx,matchidx},attrs,children},z_blocks) do
-    %{tag: ztag, attrs: zattrs, body: ast} = Enum.at(z_blocks,zidx+1)
+    %{tag: ztag, attrs: zattrs, body: ast, replace: replace?} = Enum.at(z_blocks,zidx+1)
     ast = ast_zmapping(ast,matchidx,attrs,children,z_blocks)
     attrs = Map.merge(attrs,zattrs) |> Enum.map(fn 
       {_,nil}-> []
@@ -63,6 +63,7 @@ defmodule Exz do
     end)
     use_tag = ztag || tag
     cond do
+      replace? == true-> ast
       ast in ["",[]] and use_tag in @void_elems->
         ["<#{use_tag}",attrs,">"]
       true->
