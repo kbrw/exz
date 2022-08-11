@@ -65,9 +65,11 @@ defmodule Exz do
     cond do
       replace? == true-> ast
       ast in ["",[]] and use_tag in @void_elems->
-        ["<#{use_tag}",attrs,">"]
+        [if is_binary(use_tag) do "<#{use_tag}" else ["<",use_tag] end,attrs,">"]
       true->
-        ["<#{use_tag}",attrs,">",ast,"</#{use_tag}>"]
+        [if is_binary(use_tag) do "<#{use_tag}" else ["<",use_tag] end,attrs,">",
+          ast,
+         if is_binary(use_tag) do "</#{use_tag}>" else ["</",use_tag,">"] end]
     end
   end
 
