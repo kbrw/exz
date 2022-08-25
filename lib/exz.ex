@@ -6,7 +6,7 @@ defmodule Exz do
       Module.put_attribute(__CALLER__.module,:exz_sanitizemod,opts[:sanitizer])
     end
     quote do
-      import Exz, only: [exz: 1, exz: 2]
+      import Exz, only: [exz: 1, exz: 2, cn: 2]
     end
   end
   defmacro exz(attrs,[do: exz_do] \\ [do: quote do childrenZ end]) do
@@ -117,4 +117,10 @@ defmodule Exz do
 
   def exz_sanitize(v) when v not in 0..255 and not is_list(v) and not is_binary(v) do [] end
   def exz_sanitize(v) do v end
+
+  def cn(class,keyword) do
+    to_remove = Keyword.keys(keyword) |> Enum.map(&to_string/1)
+    to_add = for {k,true}<-keyword do to_string(k) end
+    ((String.split(class,~r"\s+") -- to_remove) ++ to_add) |> Enum.join(" ")
+  end
 end
