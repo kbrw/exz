@@ -70,23 +70,28 @@ defmodule Exz do
      "</#{tag}>"]
   end
   def dom2ast({tag,{zidx,matchidx},attrs,children},z_blocks,sanitizemod) do
-    %{tag: ztag, attrs: zattrs, body: ast, replace: replace?, if: if_block} = Enum.at(z_blocks,zidx+1)
-    ast = ast_zmapping(ast,matchidx,attrs,children,z_blocks,sanitizemod)
-    attrs = Map.merge(attrs,zattrs) |> Enum.map(fn 
-      {_,nil}-> []
+    %{tag: ztag, attrs: zattrs, body: source_ast, replace: replace?, if: if_block} = Enum.at(z_blocks,zidx+1)
+    ast = ast_zmapping(source_ast,matchidx,attrs,children,z_blocks,sanitizemod)
+    {static_attrs,in_attrs} = Map.merge(attrs,zattrs) |> Enum.map(fn 
+      {_,nil}-> nil 
       {k,v} when is_binary(v)-> " #{k}=\"#{v}\""
-      {k,v} -> 
+      {k,v} ->
         v = ast_zmapping(v,matchidx,attrs,children,z_blocks,sanitizemod)
-        quote do unquote(" #{k}=\"") <> unquote(sanitize(v,sanitizemod)) <> "\"" end
-    end)
+        [" #{k}=\"",sanitize(v,sanitizemod),"\""]
+    end) |> Enum.reject(&is_nil/1) |> Enum.split_with(&is_binary/1)
     use_tag = ztag || tag
+    open_tag = case {in_attrs,use_tag} do
+      {[],use_tag} when is_binary(use_tag)-> "<#{use_tag}#{static_attrs}>"
+      {[],use_tag}-> ["<",sanitize(use_tag,sanitizemod),"#{static_attrs}>"]
+      {[_|_],use_tag} when is_binary(use_tag)-> ["<#{use_tag}#{static_attrs}",in_attrs,">"]
+      {[_|_],use_tag}-> ["<",sanitize(use_tag,sanitizemod),Enum.join(static_attrs),in_attrs,">"]
+    end
     q = cond do
-      replace? == true-> ast
-      ast in ["",[]] and use_tag in @void_elems->
-        [if is_binary(use_tag) do "<#{use_tag}" else ["<",sanitize(use_tag,sanitizemod)] end,attrs,">"]
+      replace? == true-> sanitize(ast,sanitizemod)
+      ast in ["",[]] and use_tag in @void_elems-> open_tag
       true->
-        [if is_binary(use_tag) do "<#{use_tag}" else ["<",sanitize(use_tag,sanitizemod)] end,attrs,">",
-          sanitize(ast,sanitizemod),
+        [open_tag,
+          if match?({:childrenZ,_,_},source_ast) do ast else sanitize(ast,sanitizemod) end,
          if is_binary(use_tag) do "</#{use_tag}>" else ["</",sanitize(use_tag,sanitizemod),">"] end]
     end
     if if_block do
