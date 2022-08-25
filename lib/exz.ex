@@ -1,4 +1,14 @@
 defmodule Exz do
+  @callback exz_sanitize(iodata()) :: iodata()
+
+  defmacro __using__(opts) do
+    if opts[:sanitizer] do
+      Module.put_attribute(__CALLER__.module,:exz_sanitizemod,opts[:sanitizer])
+    end
+    quote do
+      import Exz, only: [exz: 1, exz: 2]
+    end
+  end
   defmacro exz(attrs,[do: exz_do] \\ [do: quote do childrenZ end]) do
     case Exos.Proc.start_link("node --stack-size=65500 index.js",%{},[cd: '#{:code.priv_dir(:exz)}/js_dom/'], name: __MODULE__) do
       {:error, {:already_started,_}}-> :ok # ensure JS HTML parser server exists, do nothing if it is
@@ -21,6 +31,7 @@ defmodule Exz do
         {quote do childrenZ end,blocks}
     end
     
+    sanitizemod = Module.get_attribute(__CALLER__.module,:exz_sanitizemod) || Exz
     tpl_q = case {attrs[:in],attrs[:sel]} do
       {file,sel} when is_binary(file) and is_binary(sel)->
         path = Path.join(Path.expand(Mix.Project.config[:exz_dir] || "."),file)
@@ -29,7 +40,7 @@ defmodule Exz do
         zroot = %{tag: attrs[:tag], sel: attrs[:sel], replace: false, if: nil,
                  attrs: attrs |> Enum.into(%{}) |> Map.drop([:sel,:tag,:in,:debug]),
                  body: rootbody}
-        ast = dom2ast(put_elem(dom,1,{-1,0}),[zroot|z_blocks])
+        ast = dom2ast(put_elem(dom,1,{-1,0}),[zroot|z_blocks],sanitizemod)
         quote do IO.chardata_to_string(unquote(ast)) end
     end
     if attrs[:debug] do
@@ -42,9 +53,9 @@ defmodule Exz do
     tpl_q
   end
 
-  def dom2ast(bin,_z_blocks) when is_binary(bin) do bin end
+  def dom2ast(bin,_z_blocks,_sanitizemod) when is_binary(bin) do bin end
   @void_elems ~w"area base br col embed hr img input link meta source track wbr"
-  def dom2ast({tag,nil,attrs,[]},_z_blocks) when tag in @void_elems do
+  def dom2ast({tag,nil,attrs,[]},_z_blocks,_sanitizemod) when tag in @void_elems do
     attrs = Enum.map(attrs, fn {k,v}-> "#{k}=\"#{v}\"" end)
     if tag in @void_elems do
       "<#{tag} #{attrs}>"
@@ -52,30 +63,31 @@ defmodule Exz do
       "<#{tag} #{attrs}></#{tag}>"
     end
   end
-  def dom2ast({tag,nil,attrs,children},z_blocks) do
+  def dom2ast({tag,nil,attrs,children},z_blocks,sanitizemod) do
     attrs = Enum.map(attrs, fn {k,v}-> "#{k}=\"#{v}\"" end)
     ["<#{tag} #{attrs}>",
-      Enum.map(children,&dom2ast(&1,z_blocks)),
+      Enum.map(children,&dom2ast(&1,z_blocks,sanitizemod)),
      "</#{tag}>"]
   end
-  def dom2ast({tag,{zidx,matchidx},attrs,children},z_blocks) do
+  def dom2ast({tag,{zidx,matchidx},attrs,children},z_blocks,sanitizemod) do
     %{tag: ztag, attrs: zattrs, body: ast, replace: replace?, if: if_block} = Enum.at(z_blocks,zidx+1)
-    ast = ast_zmapping(ast,matchidx,attrs,children,z_blocks)
+    ast = ast_zmapping(ast,matchidx,attrs,children,z_blocks,sanitizemod)
     attrs = Map.merge(attrs,zattrs) |> Enum.map(fn 
       {_,nil}-> []
-      {k,v}-> 
-        v = ast_zmapping(v,matchidx,attrs,children,z_blocks)
-        quote do unquote(" #{k}=\"") <> unquote(v) <> "\"" end
+      {k,v} when is_binary(v)-> " #{k}=\"#{v}\""
+      {k,v} -> 
+        v = ast_zmapping(v,matchidx,attrs,children,z_blocks,sanitizemod)
+        quote do unquote(" #{k}=\"") <> unquote(sanitize(v,sanitizemod)) <> "\"" end
     end)
     use_tag = ztag || tag
     q = cond do
       replace? == true-> ast
       ast in ["",[]] and use_tag in @void_elems->
-        [if is_binary(use_tag) do "<#{use_tag}" else ["<",use_tag] end,attrs,">"]
+        [if is_binary(use_tag) do "<#{use_tag}" else ["<",sanitize(use_tag,sanitizemod)] end,attrs,">"]
       true->
-        [if is_binary(use_tag) do "<#{use_tag}" else ["<",use_tag] end,attrs,">",
-          ast,
-         if is_binary(use_tag) do "</#{use_tag}>" else ["</",use_tag,">"] end]
+        [if is_binary(use_tag) do "<#{use_tag}" else ["<",sanitize(use_tag,sanitizemod)] end,attrs,">",
+          sanitize(ast,sanitizemod),
+         if is_binary(use_tag) do "</#{use_tag}>" else ["</",sanitize(use_tag,sanitizemod),">"] end]
     end
     if if_block do
       quote do if(unquote(if_block)) do unquote(q) else [] end end
@@ -84,11 +96,15 @@ defmodule Exz do
     end
   end
 
-  def ast_zmapping(ast, matchidx, attrs, children, z_blocks) do
+  def sanitize(ast,sanitizemod) do
+    quote do unquote(sanitizemod).exz_sanitize(unquote(ast)) end
+  end
+
+  def ast_zmapping(ast, matchidx, attrs, children, z_blocks,sanitizemod) do
     {ast,_} = Macro.prewalk(ast, :no_subz, fn
       {atom,_,_}=d, _ when atom in [:z,:exz]-> {d,:subz}
       {:indexZ,_,_}, :no_subz-> {matchidx,:no_subz}
-      {:childrenZ,_,_}, :no_subz-> {Enum.map(children,&dom2ast(&1,z_blocks)),:no_subz}
+      {:childrenZ,_,_}, :no_subz-> {Enum.map(children,&dom2ast(&1,z_blocks,sanitizemod)),:no_subz}
       {id,_,_}=id_ast, :no_subz when is_atom(id)->
         case String.split(to_string(id),"Z") do
           [name,""]-> {attrs[:"#{name}"],:no_subz}
@@ -98,4 +114,7 @@ defmodule Exz do
     end)
     ast
   end
+
+  def exz_sanitize(v) when v not in 0..255 and not is_list(v) and not is_binary(v) do [] end
+  def exz_sanitize(v) do v end
 end
