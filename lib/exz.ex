@@ -32,7 +32,13 @@ defmodule Exz do
         ast = dom2ast(put_elem(dom,1,{-1,0}),[zroot|z_blocks])
         quote do IO.chardata_to_string(unquote(ast)) end
     end
-    if attrs[:debug] do IO.puts(["debug exz : expanding to :\n",tpl_q |> Macro.to_string |> Code.format_string!]) end
+    if attrs[:debug] do
+      expanded_code = tpl_q
+          |> Macro.prewalk(fn {:exz,_,_}=ast-> Macro.expand_once(ast,__CALLER__); other-> other end)
+          |> Macro.to_string
+          |> Code.format_string!
+      IO.puts(["debug exz #{attrs[:debug]}: expanding to :\n",expanded_code])
+    end
     tpl_q
   end
 
